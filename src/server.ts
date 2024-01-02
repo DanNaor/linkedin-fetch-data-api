@@ -1,6 +1,8 @@
 import express from 'express';
 import axios from 'axios';
 import bodyParser from 'body-parser';
+import dotenv from 'dotenv';
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3030;
@@ -8,7 +10,6 @@ const PROXYCURL_API_KEY = process.env.API_TOKEN
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
-
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/index.html');
 });
@@ -21,7 +22,6 @@ interface EmployeeData {
 app.post('/getEmployeeInfo', async (req, res) => {
   try {
     const { companyUrl, jobTitleKeywords } = req.body;
-
     const response = await axios.get<EmployeeData>('https://nubela.co/proxycurl/api/linkedin/company/employee/search/', {
       params: {
         linkedin_company_profile_url: companyUrl,
@@ -36,6 +36,7 @@ app.post('/getEmployeeInfo', async (req, res) => {
     });
 
     const employeeData = response.data;
+    console.log(employeeData)
     res.json(employeeData);
   } catch (error) {
     console.error('Error:', error);
