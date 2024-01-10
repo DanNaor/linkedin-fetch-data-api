@@ -24,7 +24,7 @@
   "include": [
     "src/**/*.ts",
     "src/**/*.js",
-    "src/environment.d.ts"
+    "environment.d.ts"
   ],
   "exclude": [
     "node_modules",
