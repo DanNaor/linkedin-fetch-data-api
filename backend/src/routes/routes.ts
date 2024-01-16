@@ -4,7 +4,7 @@ import axios from 'axios'
 import bodyParser from 'body-parser'
 import path from 'path'
 import { config } from 'dotenv'
-import cors from 'cors';
+import cors from 'cors'
 
 import jwt from 'jsonwebtoken'
 import { authenticate } from '../middleware/auth'
@@ -13,7 +13,7 @@ config({
 })
 
 const router = express.Router()
-const PROXYCURL_API_KEY = process.env.API_TOKEN
+const PROXYCURL_API_KEY = process.env.PROXY_CURL_API
 const HOST_URL = process.env.HOST_URL
 router.use(cors())
 router.use(bodyParser.urlencoded({ extended: true }))
@@ -24,16 +24,16 @@ interface EmployeeData {
   next_page: any
 }
 router.post('/login', async (req, res) => {
-  const { username, password } = req.body;
+  const {password }= req.body
 
   if (password !== process.env.AUTH_PASS) {
-    return res.status(401).json({ error: 'Invalid credentials' });
+    return res.status(401).json({ error: 'Invalid credentials' })
   }
-
-  const token = jwt.sign({ username }, process.env.AUTH_PASS, { expiresIn: '1h' });
-  console.log("user logged in")
-  res.json({ token });
-});
+  const token = jwt.sign({ password }, process.env.AUTH_PASS, { expiresIn: '1h' })
+  console.log(token)
+  console.log('user logged in')
+  res.json({ token })
+})
 
 router.post('/getEmployeeInfo', authenticate, async (req, res) => {
   try {

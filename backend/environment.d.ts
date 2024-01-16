@@ -1,7 +1,7 @@
 declare namespace NodeJS {
   interface ProcessEnv {
-    API_TOKEN: string;
-    HOST_URL: string;
-    AUTH_PASS: string;
+    PROXY_CURL_API: string
+    HOST_URL: string
+    AUTH_PASS: string
   }
 }
