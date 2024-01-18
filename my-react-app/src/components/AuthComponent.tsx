@@ -13,18 +13,14 @@ const AuthComponent: React.FC = () => {
 
   const login = async () => {
     try {
-      // Make a request to your Express server for authentication
-      const response = await axios.post('http://localhost:3030/login', { password });
+      const response = await axios.post(process.env.REACT_APP_SERVER_URL+'/login', { password });
 
-      // Assuming your server returns a token upon successful authentication
       const authToken = response.data.token;
 
-      // Store the token in localStorage
       localStorage.setItem('token', authToken);
 
       setToken(authToken);
 
-      // Navigate to the /data route after successful login
       navigate('/data');
     } catch (error) {
       console.error('Authentication failed:', error);

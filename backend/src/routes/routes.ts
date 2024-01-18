@@ -1,21 +1,24 @@
-// routes/routes.ts
 import express from 'express'
 import axios from 'axios'
 import bodyParser from 'body-parser'
-import path from 'path'
+import Emailable from 'emailable'
 import { config } from 'dotenv'
-import cors from 'cors'
-
 import jwt from 'jsonwebtoken'
-import { authenticate } from '../middleware/auth'
+import { authenticate } from '../Middleware/auth'
+import { workEmailWebhookData } from '../define'
+import { insertEmailToEmailsCollection } from '../database/mongodb'
+import EmailData from '../database/Models/EmailData'
+const IS_PROD_OR_DEV = process.env.NODE_ENV?.toLowerCase().startsWith('prod') ? true : false
 config({
-  path: process.env.NODE_ENV?.toLowerCase().startsWith('prod') ? `.env.prod` : '.env.dev',
+  path: IS_PROD_OR_DEV ? `.env.prod` : '.env.dev',
 })
+
+const emailable = Emailable(process.env.EMAIL_ABLE_KEY)
 
 const router = express.Router()
 const PROXYCURL_API_KEY = process.env.PROXY_CURL_API
 const HOST_URL = process.env.HOST_URL
-router.use(cors())
+
 router.use(bodyParser.urlencoded({ extended: true }))
 router.use(bodyParser.json())
 
@@ -23,8 +26,9 @@ interface EmployeeData {
   employees: any[]
   next_page: any
 }
+
 router.post('/login', async (req, res) => {
-  const {password }= req.body
+  const { password } = req.body
 
   if (password !== process.env.AUTH_PASS) {
     return res.status(401).json({ error: 'Invalid credentials' })
@@ -62,28 +66,86 @@ router.post('/getEmployeeInfo', authenticate, async (req, res) => {
 router.get('/lookupWorkEmail', authenticate, async (req, res) => {
   try {
     const { linkedin_profile_url } = req.query
-    const response = await axios.get('https://nubela.co/proxycurl/api/linkedin/profile/email', {
-      params: {
-        linkedin_profile_url: linkedin_profile_url,
-        callback_url: HOST_URL + '/workEmailWebhook',
-      },
-      headers: {
-        Authorization: `Bearer ${PROXYCURL_API_KEY}`,
-      },
-    })
-    const emailLookupResult = response.data
-    console.log(emailLookupResult)
-    res.json(emailLookupResult)
+    if (!linkedin_profile_url) {
+      return res.status(400).json({ error: 'LinkedIn profile URL is required.' })
+    }
+    if (IS_PROD_OR_DEV) {
+      const response = await axios.get('https://nubela.co/proxycurl/api/linkedin/profile/email', {
+        params: {
+          linkedin_profile_url: linkedin_profile_url,
+          callback_url: HOST_URL + `/workEmailWebhook`,
+        },
+        headers: {
+          Authorization: `Bearer ${PROXYCURL_API_KEY}`,
+        },
+      })
+      const emailLookupResult = response.data
+      console.log(emailLookupResult)
+      res.json(emailLookupResult)
+    }
+    if (!IS_PROD_OR_DEV) {
+      //return random data
+      const postData: workEmailWebhookData = {
+        email: (() => {
+          const randomString = Math.random().toString(36).substring(7)
+          return `random_${randomString}@domain.com`
+        })(),
+        status: 'email_found',
+        profile_url: (() => {
+          const randomString = Math.random().toString(36).substring(7)
+          return `https://www.linkedin.com/in/${randomString}`
+        })(),
+      }
+      const response = await axios.post(`${HOST_URL}/workEmailWebhook`, postData)
+      console.log('sent webhook data')
+    }
   } catch (error) {
     console.error('Error:', error)
     res.status(500).json({ error: 'Internal Server Error' })
   }
 })
 
-router.post('/workEmailWebhook', (req, res) => {
-  const callbackData = req.body
+router.post('/workEmailWebhook', async (req, res) => {
+  const callbackData: workEmailWebhookData = req.body
   console.log('got data from proxyUrl-:', callbackData)
-  res.status(200).send('Webhook received successfully')
+  //firstly check if proxy curl found an email
+  if (callbackData.email) {
+    //if its prod check email's deliverability and send to mongo
+    if (IS_PROD_OR_DEV) {
+      emailable
+        .verify(callbackData.email)
+        .then(function (response: any) {
+          const emailData: EmailData = {
+            emailAddress: callbackData.email,
+            linkedinProfile: callbackData.profile_url,
+            found: true,
+            deliverability: response.state,
+          }
+          insertEmailToEmailsCollection(emailData)
+        })
+        .catch(function (error: any) {
+          console.log(error)
+        })
+    } else {
+      const emailData: EmailData = {
+        emailAddress: callbackData.email,
+        linkedinProfile: callbackData.profile_url,
+        found: true,
+        deliverability: 'deliverable',
+      }
+      insertEmailToEmailsCollection(emailData)
+    }
+  }
+  //proxycurl couldn't find an email for this linkedin user
+  else {
+    const emailData: EmailData = {
+      emailAddress: null,
+      linkedinProfile: callbackData.profile_url,
+      found: false,
+      deliverability: null,
+    }
+    insertEmailToEmailsCollection(emailData)
+  }
 })
 
 export default router
