@@ -1,82 +1,122 @@
-import React, { useState, useEffect } from 'react'
-import axios from 'axios'
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { io, Socket } from 'socket.io-client';
 
 const DataComponent: React.FC = () => {
-  const [companyUrl, setCompanyUrl] = useState('')
-  const [jobTitleKeywords, setJobTitleKeywords] = useState('')
-  const [employeeData, setEmployeeData] = useState<any[]>([])
-  const [isLoadingEmployeeData, setIsLoadingEmployeeData] = useState(false)
-  const [errorEmployeeData, setErrorEmployeeData] = useState<string | null>(null)
-  const [linkedinProfileUrl, setLinkedinProfileUrl] = useState('')
-  const [emailLookupResult, setEmailLookupResult] = useState<any | null>(null)
-  const [isLoadingEmailLookup, setIsLoadingEmailLookup] = useState(false)
-  const [errorEmailLookup, setErrorEmailLookup] = useState<string | null>(null)
+  const [companyUrl, setCompanyUrl] = useState('');
+  const [jobTitleKeywords, setJobTitleKeywords] = useState('');
+  const [employeeData, setEmployeeData] = useState<any[]>([]);
+  const [isLoadingEmployeeData, setIsLoadingEmployeeData] = useState(false);
+  const [errorEmployeeData, setErrorEmployeeData] = useState<string | null>(null);
+  const [linkedinProfileUrl, setLinkedinProfileUrl] = useState('');
+  const [isLoadingEmailLookup, setIsLoadingEmailLookup] = useState(false);
+  const [errorEmailLookup, setErrorEmailLookup] = useState<string | null>(null);
+  const [realTimeData, setRealTimeData] = useState<any[]>([]);
 
+  const [socket, setSocket] = useState<Socket | null>(null);
 
+  useEffect(() => {
+    const newSocket = io(process.env.REACT_APP_SERVER_URL || 'http://localhost:3030');
+  
+    // Set the socket instance in the state
+    setSocket(newSocket);
+  
+    // Clean up the socket connection when the component unmounts
+    return () => {
+      if (newSocket) {
+        newSocket.disconnect();
+        setSocket(null); // Reset the socket instance in the state
+      }
+    };
+  }, []); // E
+  useEffect(() => {
+    if (socket) {
+      // Listen for the initial data
+      socket.on('initialEmailData', (data: any) => {
+        setRealTimeData(data);
+      });
 
-  const fetchData = async () => {
-    setIsLoadingEmployeeData(true)
+      // Listen for new data
+      socket.on('newEmailData', (newData: any) => {
+        setRealTimeData((prevData) => [...prevData, newData]);
+      });
+    }
+
+    // Clean up the event listeners when the component unmounts
+    return () => {
+      if (socket) {
+        socket.off('initialEmailData');
+        socket.off('newEmailData');
+      }
+    };
+  }, [socket]);
+
+  const fetchEmployeeData = async () => {
+    setIsLoadingEmployeeData(true);
     try {
       const response = await axios.post(
-        process.env.REACT_APP_SERVER_URL+'/getEmployeeInfo',
+        process.env.REACT_APP_SERVER_URL + '/getEmployeeInfo',
         { companyUrl, jobTitleKeywords },
-        {
+        { 
           headers: {
             Authorization: ` ${localStorage.getItem('token')}`,
           },
         },
-      )
-      setEmployeeData(response.data.employees)
-      setErrorEmployeeData(null)
+      );
+      setEmployeeData(response.data.employees);
+      setErrorEmployeeData(null);
     } catch (error) {
-      console.error('Error fetching data:', error)
-      setErrorEmployeeData('Error fetching data. Please try again.')
+      console.error('Error fetching data:', error);
+      setErrorEmployeeData('Error fetching data. Please try again.');
     } finally {
-      setIsLoadingEmployeeData(false)
+      setIsLoadingEmployeeData(false);
     }
-  }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
+    const { name, value } = e.target;
     if (name === 'companyUrl') {
-      setCompanyUrl(value)
+      setCompanyUrl(value);
     } else if (name === 'jobTitleKeywords') {
-      setJobTitleKeywords(value)
+      setJobTitleKeywords(value);
     }
-  }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    await fetchData()
-  }
+    e.preventDefault();
+    await fetchEmployeeData();
+  };
 
   const handleEmailLookup = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoadingEmailLookup(true)
-
+    e.preventDefault();
+    setIsLoadingEmailLookup(true);
+  
     try {
-      console.log('Request URL:', process.env.REACT_APP_SERVER_URL + '/lookupWorkEmail', {
-        params: {
-          linkedin_profile_url: linkedinProfileUrl,
-        },
-      });
-      const response = await axios.get(process.env.REACT_APP_SERVER_URL+'/lookupWorkEmail', {
+      // Only need to check the status code
+      await axios.get(process.env.REACT_APP_SERVER_URL + '/lookupWorkEmail', {
         params: {
           linkedin_profile_url: linkedinProfileUrl,
         },
         headers: {
           Authorization: ` ${localStorage.getItem('token')}`,
         },
-      })
-      console.log(response)
-      setErrorEmailLookup(null)
+      });
+  
+      setErrorEmailLookup(null);
     } catch (error) {
-      console.error('Error fetching email lookup data:', error)
-      setErrorEmailLookup('Error fetching email lookup data. Please try again.')
+      console.error('Error triggering email lookup:', error);
+      setErrorEmailLookup('Error triggering email lookup. Please try again.');
     } finally {
-      setIsLoadingEmailLookup(false)
+      try {
+        // Ensure that setIsLoadingEmailLookup(false) is executed after updating the state
+        setIsLoadingEmailLookup(false);
+      } catch (error) {
+        console.error('Error resetting loading state:', error);
+      }
     }
-  }
+  };
+  
+
   return (
     <div>
       <h2>operations-</h2>
@@ -110,14 +150,30 @@ const DataComponent: React.FC = () => {
       </form>
       {isLoadingEmailLookup && <p>Loading email lookup data...</p>}
       {errorEmailLookup && <p style={{ color: 'red' }}>{errorEmailLookup}</p>}
-      {emailLookupResult && (
-        <div>
-          <h3>Email Lookup Result</h3>
-          <pre>{JSON.stringify(emailLookupResult, null, 2)}</pre>
-        </div>
-      )}
-    </div>
-  )
-}
 
-export default DataComponent
+      <h2>Real-time Data</h2>
+      <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+        <thead>
+          <tr>
+            <th style={{ border: '1px solid #ddd', padding: '8px' }}>Email Address</th>
+            <th style={{ border: '1px solid #ddd', padding: '8px' }}>LinkedIn Profile</th>
+            <th style={{ border: '1px solid #ddd', padding: '8px' }}>Found</th>
+            <th style={{ border: '1px solid #ddd', padding: '8px' }}>Deliverability</th>
+          </tr>
+        </thead>
+        <tbody>
+          {realTimeData.map((data, index) => (
+            <tr key={index}>
+              <td style={{ border: '1px solid #ddd', padding: '8px' }}>{data.emailAddress}</td>
+              <td style={{ border: '1px solid #ddd', padding: '8px' }}>{data.linkedinProfile}</td>
+              <td style={{ border: '1px solid #ddd', padding: '8px' }}>{data.found ? 'Yes' : 'No'}</td>
+              <td style={{ border: '1px solid #ddd', padding: '8px' }}>{data.deliverability}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+export default DataComponent;

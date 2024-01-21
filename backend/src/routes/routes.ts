@@ -6,15 +6,16 @@ import { config } from 'dotenv'
 import jwt from 'jsonwebtoken'
 import { authenticate } from '../Middleware/auth'
 import { workEmailWebhookData } from '../define'
-import { insertEmailToEmailsCollection } from '../database/mongodb'
 import EmailData from '../database/Models/EmailData'
+import MongoDb from '../database/mongodb'
+import {  db, io } from '../server'
+import { emitNewEmailData } from '../WebSocket/webSocket'
 const IS_PROD_OR_DEV = process.env.NODE_ENV?.toLowerCase().startsWith('prod') ? true : false
 config({
   path: IS_PROD_OR_DEV ? `.env.prod` : '.env.dev',
 })
 
 const emailable = Emailable(process.env.EMAIL_ABLE_KEY)
-
 const router = express.Router()
 const PROXYCURL_API_KEY = process.env.PROXY_CURL_API
 const HOST_URL = process.env.HOST_URL
@@ -96,7 +97,7 @@ router.get('/lookupWorkEmail', authenticate, async (req, res) => {
           return `https://www.linkedin.com/in/${randomString}`
         })(),
       }
-      const response = await axios.post(`${HOST_URL}/workEmailWebhook`, postData)
+      await axios.post(`${HOST_URL}/workEmailWebhook`, postData)
       console.log('sent webhook data')
     }
   } catch (error) {
@@ -121,7 +122,8 @@ router.post('/workEmailWebhook', async (req, res) => {
             found: true,
             deliverability: response.state,
           }
-          insertEmailToEmailsCollection(emailData)
+          db.insertEmailToEmailsCollection(emailData)
+          emitNewEmailData(io,emailData)
         })
         .catch(function (error: any) {
           console.log(error)
@@ -133,7 +135,8 @@ router.post('/workEmailWebhook', async (req, res) => {
         found: true,
         deliverability: 'deliverable',
       }
-      insertEmailToEmailsCollection(emailData)
+      db.insertEmailToEmailsCollection(emailData)
+      emitNewEmailData(io,emailData)
     }
   }
   //proxycurl couldn't find an email for this linkedin user
@@ -144,7 +147,8 @@ router.post('/workEmailWebhook', async (req, res) => {
       found: false,
       deliverability: null,
     }
-    insertEmailToEmailsCollection(emailData)
+    db.insertEmailToEmailsCollection(emailData)
+    emitNewEmailData(io,emailData)
   }
 })
 
