@@ -8,7 +8,7 @@ import { authenticate } from '../Middleware/auth'
 import { workEmailWebhookData } from '../define'
 import EmailData from '../database/Models/EmailData'
 import MongoDb from '../database/mongodb'
-import {  db, io } from '../server'
+import { db, io } from '../server'
 import { emitNewEmailData } from '../WebSocket/webSocket'
 const IS_PROD_OR_DEV = process.env.NODE_ENV?.toLowerCase().startsWith('prod') ? true : false
 config({
@@ -70,6 +70,10 @@ router.get('/lookupWorkEmail', authenticate, async (req, res) => {
     if (!linkedin_profile_url) {
       return res.status(400).json({ error: 'LinkedIn profile URL is required.' })
     }
+    const isExist = await db.emailExists(linkedin_profile_url as string)
+    if (isExist) {
+      return res.status(400).json({ error: 'already exist.' })
+    }
     if (IS_PROD_OR_DEV) {
       const response = await axios.get('https://nubela.co/proxycurl/api/linkedin/profile/email', {
         params: {
@@ -123,7 +127,7 @@ router.post('/workEmailWebhook', async (req, res) => {
             deliverability: response.state,
           }
           db.insertEmailToEmailsCollection(emailData)
-          emitNewEmailData(io,emailData)
+          emitNewEmailData(io, emailData)
         })
         .catch(function (error: any) {
           console.log(error)
@@ -135,8 +139,8 @@ router.post('/workEmailWebhook', async (req, res) => {
         found: true,
         deliverability: 'deliverable',
       }
-      db.insertEmailToEmailsCollection(emailData)
-      emitNewEmailData(io,emailData)
+      const res = db.insertEmailToEmailsCollection(emailData)
+      emitNewEmailData(io, emailData)
     }
   }
   //proxycurl couldn't find an email for this linkedin user
@@ -148,7 +152,7 @@ router.post('/workEmailWebhook', async (req, res) => {
       deliverability: null,
     }
     db.insertEmailToEmailsCollection(emailData)
-    emitNewEmailData(io,emailData)
+    emitNewEmailData(io, emailData)
   }
 })
 
