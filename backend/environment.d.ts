@@ -6,5 +6,6 @@ declare namespace NodeJS {
     EMAIL_ABLE_KEY: string
     MONGODB_DB_NAME:string
     MONGODB_URI:string
+    HUBSPOT_TOKEN:string
   }
 }

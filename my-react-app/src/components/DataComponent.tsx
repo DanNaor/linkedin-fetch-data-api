@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { io, Socket } from 'socket.io-client';
+import CsvDownloadButton from 'react-json-to-csv';
+import { saveAs } from 'file-saver';
 
 const DataComponent: React.FC = () => {
   const [companyUrl, setCompanyUrl] = useState('');
@@ -12,37 +14,40 @@ const DataComponent: React.FC = () => {
   const [isLoadingEmailLookup, setIsLoadingEmailLookup] = useState(false);
   const [errorEmailLookup, setErrorEmailLookup] = useState<string | null>(null);
   const [realTimeData, setRealTimeData] = useState<any[]>([]);
+  const [isWebSocketError, setIsWebSocketError] = useState(false);
+  const [isEmailLookupError, setIsEmailLookupError] = useState(false);
 
   const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(() => {
     const newSocket = io(process.env.REACT_APP_SERVER_URL || 'http://localhost:3030');
-  
-    // Set the socket instance in the state
+
     setSocket(newSocket);
-  
-    // Clean up the socket connection when the component unmounts
+
+    newSocket.on('connect_error', (error: any) => {
+      console.error('WebSocket connection error:', error);
+      setIsWebSocketError(true);
+    });
+
     return () => {
       if (newSocket) {
         newSocket.disconnect();
-        setSocket(null); // Reset the socket instance in the state
+        setSocket(null);
       }
     };
-  }, []); // E
+  }, []);
+
   useEffect(() => {
     if (socket) {
-      // Listen for the initial data
       socket.on('initialEmailData', (data: any) => {
         setRealTimeData(data);
       });
 
-      // Listen for new data
       socket.on('newEmailData', (newData: any) => {
         setRealTimeData((prevData) => [...prevData, newData]);
       });
     }
 
-    // Clean up the event listeners when the component unmounts
     return () => {
       if (socket) {
         socket.off('initialEmailData');
@@ -90,9 +95,8 @@ const DataComponent: React.FC = () => {
   const handleEmailLookup = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoadingEmailLookup(true);
-  
+
     try {
-      // Only need to check the status code
       await axios.get(process.env.REACT_APP_SERVER_URL + '/lookupWorkEmail', {
         params: {
           linkedin_profile_url: linkedinProfileUrl,
@@ -101,24 +105,41 @@ const DataComponent: React.FC = () => {
           Authorization: ` ${localStorage.getItem('token')}`,
         },
       });
-  
+
       setErrorEmailLookup(null);
+      setIsEmailLookupError(false);
     } catch (error) {
       console.error('Error triggering email lookup:', error);
       setErrorEmailLookup('Error triggering email lookup. Please try again.');
+      setIsEmailLookupError(true);
     } finally {
       try {
-        // Ensure that setIsLoadingEmailLookup(false) is executed after updating the state
         setIsLoadingEmailLookup(false);
       } catch (error) {
         console.error('Error resetting loading state:', error);
       }
     }
   };
-  
+
+  const handleDownload = () => {
+    // Download as CSV
+    const csvContent = 'data:text/csv;charset=utf-8,' + employeeData.map((row) => Object.values(row).join(',')).join('\n');
+    const csvBlob = new Blob([csvContent], { type: 'text/csv' });
+    saveAs(csvBlob, 'employee_data.csv');
+
+    // Download as JSON
+    const jsonContent = JSON.stringify(employeeData, null, 2);
+    const jsonBlob = new Blob([jsonContent], { type: 'application/json' });
+    saveAs(jsonBlob, 'employee_data.json');
+  };
+
+  function addToHubSpot(emailAddress: any): void {
+    throw new Error('Function not implemented.');
+  }
 
   return (
     <div>
+      {isWebSocketError && <p style={{ color: 'red', fontSize: '18px' }}>WebSocket connection error. Please check your connection.</p>}
       <h2>operations-</h2>
       <form onSubmit={handleSubmit}>
         <label>
@@ -135,8 +156,12 @@ const DataComponent: React.FC = () => {
       </form>
       {isLoadingEmployeeData && <p>Loading employee data...</p>}
       {errorEmployeeData && <p style={{ color: 'red' }}>{errorEmployeeData}</p>}
-      <h3>Employee Data</h3>
-      <pre>{JSON.stringify(employeeData, null, 2)}</pre>
+      {employeeData.length > 0 && (
+        <div>
+          <h3>Employee Data</h3>
+          <button onClick={handleDownload}>Download CSV & JSON</button>
+        </div>
+      )}
 
       <h2>Email Lookup</h2>
       <form onSubmit={handleEmailLookup}>
@@ -149,9 +174,9 @@ const DataComponent: React.FC = () => {
         </button>
       </form>
       {isLoadingEmailLookup && <p>Loading email lookup data...</p>}
-      {errorEmailLookup && <p style={{ color: 'red' }}>{errorEmailLookup}</p>}
-
-      <h2>Real-time Data</h2>
+      {isEmailLookupError && <p style={{ color: 'red' }}>{errorEmailLookup}</p>}
+      
+      <h2>Real-time Email Data</h2>
       <table style={{ borderCollapse: 'collapse', width: '100%' }}>
         <thead>
           <tr>
@@ -168,6 +193,9 @@ const DataComponent: React.FC = () => {
               <td style={{ border: '1px solid #ddd', padding: '8px' }}>{data.linkedinProfile}</td>
               <td style={{ border: '1px solid #ddd', padding: '8px' }}>{data.found ? 'Yes' : 'No'}</td>
               <td style={{ border: '1px solid #ddd', padding: '8px' }}>{data.deliverability}</td>
+              <td style={{ border: '1px solid #ddd', padding: '8px' }}>
+              {data.found && <button onClick={() => addToHubSpot(data)}>Add to HubSpot</button>}
+              </td>
             </tr>
           ))}
         </tbody>

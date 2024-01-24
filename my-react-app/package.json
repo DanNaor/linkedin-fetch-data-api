@@ -11,8 +11,10 @@
     "@types/react": "^18.2.47",
     "@types/react-dom": "^18.2.18",
     "axios": "^1.6.5",
+    "file-saver": "^2.0.5",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-json-to-csv": "^1.2.0",
     "react-router-dom": "^6.21.2",
     "react-scripts": "5.0.1",
     "socket.io-client": "^4.7.4",
@@ -42,5 +44,9 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "@types/file-saver": "^2.0.7",
+    "@types/react-json-to-csv": "^1.2.4"
   }
 }

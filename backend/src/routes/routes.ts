@@ -2,18 +2,13 @@ import express from 'express'
 import axios from 'axios'
 import bodyParser from 'body-parser'
 import Emailable from 'emailable'
-import { config } from 'dotenv'
 import jwt from 'jsonwebtoken'
+import hubspotClient from '../hubspotClient'
 import { authenticate } from '../Middleware/auth'
 import { workEmailWebhookData } from '../define'
 import EmailData from '../database/Models/EmailData'
-import MongoDb from '../database/mongodb'
-import { db, io } from '../server'
+import { IS_PROD_OR_DEV, db, io } from '../server'
 import { emitNewEmailData } from '../WebSocket/webSocket'
-const IS_PROD_OR_DEV = process.env.NODE_ENV?.toLowerCase().startsWith('prod') ? true : false
-config({
-  path: IS_PROD_OR_DEV ? `.env.prod` : '.env.dev',
-})
 
 const emailable = Emailable(process.env.EMAIL_ABLE_KEY)
 const router = express.Router()
@@ -110,6 +105,43 @@ router.get('/lookupWorkEmail', authenticate, async (req, res) => {
   }
 })
 
+router.post('/addContact', authenticate, async (req, res) => {
+  try {
+    const { clientEmailAddress, contactEmailAddress } = req.body
+    //will always be a dan@shuffll.com address in dev
+    if (!contactEmailAddress || !clientEmailAddress) {
+      return res.status(400).json({ error: 'Incomplete data provided.' })
+    }
+    const ownerId = await hubspotClient.getOwnerId(clientEmailAddress)
+
+    const contactObj = {
+      properties: {
+        firstname: contactEmailAddress,
+        email: contactEmailAddress,
+      },
+    }
+
+    // const hubspotContactProperties = {
+    //   properties:{
+    //     //will be the users real name after MVP deployed
+    //     { property: 'NAME', value: contactEmailAddress },
+    //     { property: 'EMAIL', value: contactEmailAddress },
+    //     { property: 'CONTACT OWNER', value: ownerId },
+    //     // { property: 'LEAD STATUS', value: 'Linkedin Contact' },
+    //     // { property: 'MARKETING CONTACT STATUS', value: 'Marketing Contact' },
+    //   },
+    // }
+
+    // Use the HubSpot client to create the contact
+    await hubspotClient.createContact(contactObj)
+
+    // Respond with success
+    res.json({ success: true })
+  } catch (error) {
+    console.error('Error:', error)
+    res.status(500).json({ error: 'Internal Server Error' })
+  }
+})
 router.post('/workEmailWebhook', async (req, res) => {
   const callbackData: workEmailWebhookData = req.body
   console.log('got data from proxyUrl-:', callbackData)
