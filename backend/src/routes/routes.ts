@@ -118,6 +118,7 @@ router.post('/addContact', authenticate, async (req, res) => {
       properties: {
         firstname: contactEmailAddress,
         email: contactEmailAddress,
+        hubspot_owner_id: ownerId,
       },
     }
 
