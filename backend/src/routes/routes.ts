@@ -107,31 +107,28 @@ router.get('/lookupWorkEmail', authenticate, async (req, res) => {
 
 router.post('/addContact', authenticate, async (req, res) => {
   try {
-    const { clientEmailAddress, contactEmailAddress,linkedinProfile } = req.body
     //will always be a dan@shuffll.com address in dev
-    if (!contactEmailAddress || !clientEmailAddress||!linkedinProfile) {
+    const { clientEmailAddress: contactOwnerEmailAddress ,emailAddress: contactEmailAddress, linkedinProfile } = req.body
+
+    if (!contactOwnerEmailAddress || !contactEmailAddress || !linkedinProfile) {
       return res.status(400).json({ error: 'Incomplete data provided.' })
     }
-    const ownerId = await hubspotClient.getOwnerId(clientEmailAddress)
-
+    const ownerId = await hubspotClient.getOwnerId(contactOwnerEmailAddress)
+    const response = await axios.get('https://nubela.co/proxycurl/api/v2/linkedin', {
+      params: {
+        linkedin_profile_url: linkedinProfile,
+      },
+      headers: {
+        Authorization: `Bearer ${PROXYCURL_API_KEY}`,
+      },
+    })
     const contactObj = {
       properties: {
-        firstname: contactEmailAddress,
+        firstname: response.data.full_name,
         email: contactEmailAddress,
         hubspot_owner_id: ownerId,
       },
     }
-
-    // const hubspotContactProperties = {
-    //   properties:{
-    //     //will be the users real name after MVP deployed
-    //     { property: 'NAME', value: contactEmailAddress },
-    //     { property: 'EMAIL', value: contactEmailAddress },
-    //     { property: 'CONTACT OWNER', value: ownerId },
-    //     // { property: 'LEAD STATUS', value: 'Linkedin Contact' },
-    //     // { property: 'MARKETING CONTACT STATUS', value: 'Marketing Contact' },
-    //   },
-    // }
 
     // Use the HubSpot client to create the contact
     await hubspotClient.createContact(contactObj)
