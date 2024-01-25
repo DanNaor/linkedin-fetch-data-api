@@ -133,9 +133,37 @@ const DataComponent: React.FC = () => {
     saveAs(jsonBlob, 'employee_data.json');
   };
 
-  function addToHubSpot(emailAddress: any): void {
-    throw new Error('Function not implemented.');
+  function addToHubSpot(data: any): void {
+    const { clientEmailAddress, linkedinProfile, deliverability } = data;
+  
+    const contactObj = {
+      properties: {
+        firstname: clientEmailAddress,  
+        email: clientEmailAddress,
+        linkedinProfile,  
+        deliverability, 
+      },
+    };
+  
+    axios.post(
+      process.env.REACT_APP_SERVER_URL + '/addContact',
+      { clientEmailAddress, contactEmailAddress: "dan@shuffll.com" },  
+      {
+        headers: {
+          Authorization: ` ${localStorage.getItem('token')}`,
+        },
+      }
+    )
+    .then((response) => {
+      console.log('Contact added successfully:', response.data);
+      // Optionally, you can update the UI or perform other actions after successful addition
+    })
+    .catch((error) => {
+      console.error('Error adding contact to HubSpot:', error);
+      // Handle the error appropriately
+    });
   }
+  
 
   return (
     <div>

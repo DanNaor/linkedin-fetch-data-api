@@ -107,9 +107,9 @@ router.get('/lookupWorkEmail', authenticate, async (req, res) => {
 
 router.post('/addContact', authenticate, async (req, res) => {
   try {
-    const { clientEmailAddress, contactEmailAddress } = req.body
+    const { clientEmailAddress, contactEmailAddress,linkedinProfile } = req.body
     //will always be a dan@shuffll.com address in dev
-    if (!contactEmailAddress || !clientEmailAddress) {
+    if (!contactEmailAddress || !clientEmailAddress||!linkedinProfile) {
       return res.status(400).json({ error: 'Incomplete data provided.' })
     }
     const ownerId = await hubspotClient.getOwnerId(clientEmailAddress)
