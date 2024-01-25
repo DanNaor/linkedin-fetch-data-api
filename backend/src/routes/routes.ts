@@ -9,7 +9,6 @@ import { workEmailWebhookData } from '../define'
 import EmailData from '../database/Models/EmailData'
 import { IS_PROD_OR_DEV, db, io } from '../server'
 import { emitNewEmailData } from '../WebSocket/webSocket'
-import { OAuth2Client } from 'google-auth-library';
 
 const emailable = Emailable(process.env.EMAIL_ABLE_KEY)
 const router = express.Router()
@@ -46,9 +45,7 @@ router.post('/login', async (req, res) => {
 });
 
 const verifyGoogleToken = async (token: string): Promise<any> => {
-  const googleClientId = process.env.GOOGLE_CLIENT_ID; 
-  const client = new OAuth2Client(googleClientId);
-
+  const googleClientId = process.env; // Replace with your actual Google Client ID
   const ticket = await client.verifyIdToken({
     idToken: token,
     audience: googleClientId,
