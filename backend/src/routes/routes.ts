@@ -9,6 +9,7 @@ import { workEmailWebhookData } from '../define'
 import EmailData from '../database/Models/EmailData'
 import { IS_PROD_OR_DEV, db, io } from '../server'
 import { emitNewEmailData } from '../WebSocket/webSocket'
+import { OAuth2Client } from 'google-auth-library';
 
 const emailable = Emailable(process.env.EMAIL_ABLE_KEY)
 const router = express.Router()
@@ -22,18 +23,50 @@ interface EmployeeData {
   employees: any[]
   next_page: any
 }
-
 router.post('/login', async (req, res) => {
-  const { password } = req.body
+  try {
+    const { googleToken } = req.body;
 
-  if (password !== process.env.AUTH_PASS) {
-    return res.status(401).json({ error: 'Invalid credentials' })
+    if (!googleToken) {
+      return res.status(400).json({ error: 'Google token is required.' });
+    }
+
+    // Verify the Google token here
+    const googleUserData = await verifyGoogleToken(googleToken);
+
+    // Perform additional checks or user registration if needed
+
+    // Generate a new token for the user
+    const token = jwt.sign({ user: googleUserData }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    res.json({ token });
+  } catch (error) {
+    console.error('Google Sign-In failed:', error);
+    res.status(401).json({ error: 'Google Sign-In failed' });
   }
-  const token = jwt.sign({ password }, process.env.AUTH_PASS, { expiresIn: '1h' })
-  console.log(token)
-  console.log('user logged in')
-  res.json({ token })
-})
+});
+
+const verifyGoogleToken = async (token: string): Promise<any> => {
+  const googleClientId = process.env.GOOGLE_CLIENT_ID; 
+  const client = new OAuth2Client(googleClientId);
+
+  const ticket = await client.verifyIdToken({
+    idToken: token,
+    audience: googleClientId,
+  });
+  const payload = ticket.getPayload();
+  return payload;
+};
+// router.post('/login', async (req, res) => {
+//   const { password } = req.body
+
+//   if (password !== process.env.AUTH_PASS) {
+//     return res.status(401).json({ error: 'Invalid credentials' })
+//   }
+//   const token = jwt.sign({ password }, process.env.AUTH_PASS, { expiresIn: '1h' })
+//   console.log(token)
+//   console.log('user logged in')
+//   res.json({ token })
+// })
 
 router.post('/getEmployeeInfo', authenticate, async (req, res) => {
   try {

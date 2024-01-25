@@ -4,8 +4,11 @@ declare namespace NodeJS {
     HOST_URL: string
     AUTH_PASS: string
     EMAIL_ABLE_KEY: string
-    MONGODB_DB_NAME:string
-    MONGODB_URI:string
-    HUBSPOT_TOKEN:string
+    MONGODB_DB_NAME: string
+    MONGODB_URI: string
+    HUBSPOT_TOKEN: string
+    GOOGLE_CLIENT_ID: string
+    GOOGLE_SECRET: string
+    JWT_SECRET:string
   }
 }

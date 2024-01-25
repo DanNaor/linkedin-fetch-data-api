@@ -1,40 +1,47 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { GoogleLogin } from '@react-oauth/google'
+import axios from 'axios'
 
 const AuthComponent: React.FC = () => {
-  const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
-  const [password, setPassword] = useState('');
-  const navigate = useNavigate();
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPassword(e.target.value);
-  };
-
-  const login = async () => {
+  const [token, setToken] = useState<string | null>(localStorage.getItem('token'))
+  const navigate = useNavigate()
+  async function auth() {
+    const response = await fetch(process.env.REACT_APP_SERVER_URL + '/request', { method: 'post' })
+    const data = await response.json()
+    console.log(data)
+    navigate(data.url)
+  }
+  const googleLoginSuccess = async (response: any) => {
     try {
-      const response = await axios.post(process.env.REACT_APP_SERVER_URL+'/login', { password });
+      const serverResponse = await axios.post(process.env.REACT_APP_SERVER_URL + '/login', {
+        googleToken: response.tokenId,
+      })
 
-      const authToken = response.data.token;
+      const authToken = serverResponse.data.token
 
-      localStorage.setItem('token', authToken);
+      localStorage.setItem('token', authToken)
+      setToken(authToken)
 
-      setToken(authToken);
-
-      navigate('/data');
+      navigate('/data')
     } catch (error) {
-      console.error('Authentication failed:', error);
+      console.error('Google Sign-In failed:', error)
     }
-  };
+  }
+
+  const googleLoginFailure = (error: any) => {
+    console.error('Google Sign-In failed:', error)
+    console.error('Google Sign-In failed:', error)
+  }
 
   const logout = () => {
-    // Remove the token from localStorage
-    localStorage.removeItem('token');
-    setToken(null);
+    // Clear the token from localStorage
+    localStorage.removeItem('token')
+    setToken(null)
 
     // Navigate to the home route after logout
-    navigate('/');
-  };
+    navigate('/')
+  }
 
   return (
     <div>
@@ -42,15 +49,19 @@ const AuthComponent: React.FC = () => {
         <button onClick={logout}>Logout</button>
       ) : (
         <div>
-          <label>
-            Password:
-            <input type="password" name="password" value={password} onChange={handleChange} />
-          </label>
-          <button onClick={login}>Login</button>
+          <GoogleLogin
+            onSuccess={(credentialResponse) => {
+              console.log(credentialResponse)
+            }}
+            onError={() => {
+              console.log('Login Failed')
+            }}
+          />
+          ;
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default AuthComponent;
+export default AuthComponent
